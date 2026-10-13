@@ -1,0 +1,1600 @@
+{
+  "name": "SLA Driven Lead Escalation Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "b0ae2e1c-4bbb-429d-a811-34a789b1488f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fe450535-a82c-426e-8f16-50fa24db1565",
+      "name": "Webhook",
+      "webhookId": "b0ae2e1c-4bbb-429d-a811-34a789b1488f"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appOv2X5drNYPGmlM",
+          "mode": "list",
+          "cachedResultName": "Lead Escalation Engine",
+          "cachedResultUrl": "https://airtable.com/appOv2X5drNYPGmlM"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblIbXoK7cr3NwOtO",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appOv2X5drNYPGmlM/tblIbXoK7cr3NwOtO"
+        },
+        "filterByFormula": "=AND({Status} = 'Active', RECORD_ID() != '{{ $('attempt tracking').last().json.excludedAgentId }}')",
+        "options": {
+          "fields": [
+            "Status",
+            "Agent Name",
+            "Phone Number",
+            "Email / GCal ID",
+            "Tier",
+            "Telegram ID"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "3facdc26-3a66-43ff-82dc-ef61d9c77315",
+      "name": "Search records",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $json.fields['Email / GCal ID'] }}",
+          "mode": "id"
+        },
+        "timeMax": "={{ $now.plus(30, 'minutes') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "65f80f42-8035-4ea3-9bfa-82abc28a30e7",
+      "name": "Get availability in a calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "DIL2TIITldKcFrnP",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a4c62ad-7b6f-45c1-adfe-3da375905a85",
+              "name": "acceptlink",
+              "value": "={{ $execution.resumeUrl }}&agentid={{ $('Search records').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "bcc7d209-f6cb-432a-9004-c4916a8f3ebe",
+              "name": "telegramId",
+              "value": "={{ $('Search records').item.json.fields['Telegram ID'] }}",
+              "type": "string"
+            },
+            {
+              "id": "cc465917-2a47-4c38-b3f4-0119dad61462",
+              "name": "agentName",
+              "value": "={{ $('Search records').item.json.fields['Agent Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "f68b7167-d2c3-4cc1-8124-5a19be0e373c",
+              "name": "agentRecordId",
+              "value": "={{ $('Search records').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        32,
+        304
+      ],
+      "id": "8e448144-beb4-4778-8072-18e2badc5d07",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "limitWaitTime": true,
+        "resumeUnit": "minutes",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        304
+      ],
+      "id": "f1baf4af-679d-4491-b448-5f801ed4697a",
+      "name": "Wait",
+      "webhookId": "d0316c8e-3485-4f5f-9382-14eab54ccd1f"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramId }}",
+        "text": "=🏠 NEW LEAD — ACTION NEEDED\n\nName: {{ $('Webhook').item.json.body.lead_name }}\nProperty: {{ $('Webhook').item.json.body.property }}\nPhone: {{ $('Webhook').item.json.body.lead_phone }}\n\nFirst to accept gets the lead. You have 3 minutes.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Accept Lead",
+                    "additionalFields": {
+                      "url": "={{ $('Edit Fields').item.json.acceptlink }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        432,
+        304
+      ],
+      "id": "0ec7f269-2eda-40b9-8fd1-c5b11ce35283",
+      "name": "Send a text message",
+      "webhookId": "24723985-6843-411a-bae2-fc976088b244",
+      "credentials": {
+        "telegramApi": {
+          "id": "KlzaAi4OrJBcw89J",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        224,
+        304
+      ],
+      "id": "d22ef41b-366a-4c9c-92d6-e0e773b8b5f6",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "451a319d-2abf-40b7-9aa1-fac47c49edf5",
+              "leftValue": "={{ $json.query.agentid }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        144
+      ],
+      "id": "98f74971-035b-4b31-9929-56487aa9a79f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appusvuMelGd1hjox",
+          "mode": "list",
+          "cachedResultName": "Engine Leads",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblpSNcTwSrlVu4tI",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox/tblpSNcTwSrlVu4tI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Assigned",
+            "Assigned Agent": "={{ $('Search records').item.json.fields['Agent Name'] }}",
+            "id": "={{ $('Create a record').item.json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Property Address",
+              "displayName": "Property Address",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Expired",
+                  "value": "Expired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1296,
+        368
+      ],
+      "id": "8cf10ce4-c0ac-4022-861b-16d8307f6688",
+      "name": "Update record1",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appusvuMelGd1hjox",
+          "mode": "list",
+          "cachedResultName": "Engine Leads",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblpSNcTwSrlVu4tI",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox/tblpSNcTwSrlVu4tI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead Name": "={{ $('Webhook').item.json.body.lead_name }}",
+            "Property Address": "={{ $('Webhook').item.json.body.property }}",
+            "Phone": "={{ $('Webhook').item.json.body.lead_phone }}",
+            "Status": "New",
+            "Timestamp": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Property Address",
+              "displayName": "Property Address",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Expired",
+                  "value": "Expired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "cd8acac9-f279-4147-9b29-53c6af6e5db0",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "04e3de27-e506-431a-b889-78347b7c68f3",
+              "name": "attempt",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "687aa188-cd96-4d90-a517-dc6e4050b9b3",
+              "name": "excludedAgentId",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5157f078-8da2-4976-bb3e-57760fbf50ac",
+      "name": "attempt tracking"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e24f992-6938-4f99-b692-8e4d1d2bf36e",
+              "name": "excludedAgentId",
+              "value": "=",
+              "type": "string"
+            },
+            {
+              "id": "c5587350-437d-4dfc-ab5c-6f6ae46d043f",
+              "name": "attempt",
+              "value": "={{ $('attempt tracking').item.json.attempt + 1}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        -48
+      ],
+      "id": "a22fa7cb-e6fe-4e62-baf9-ed2c87bbe63f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appOv2X5drNYPGmlM",
+          "mode": "list",
+          "cachedResultName": "Lead Escalation Engine",
+          "cachedResultUrl": "https://airtable.com/appOv2X5drNYPGmlM"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblIbXoK7cr3NwOtO",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appOv2X5drNYPGmlM/tblIbXoK7cr3NwOtO"
+        },
+        "filterByFormula": "=AND({Status} = 'Active', RECORD_ID() != '{{ $('Edit Fields').item.json.agentRecordId }}')",
+        "options": {
+          "fields": []
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        -48
+      ],
+      "id": "7391b906-20d7-4082-be0a-3fe1430ac144",
+      "name": "Agent 2 Search",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a4c62ad-7b6f-45c1-adfe-3da375905a85",
+              "name": "acceptlink",
+              "value": "={{ $execution.resumeUrl }}&agentid={{ $('Agent 2 Search').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "bcc7d209-f6cb-432a-9004-c4916a8f3ebe",
+              "name": "telegramId",
+              "value": "={{ $('Agent 2 Search').item.json.fields['Telegram ID'] }}",
+              "type": "string"
+            },
+            {
+              "id": "cc465917-2a47-4c38-b3f4-0119dad61462",
+              "name": "agentName",
+              "value": "={{ $('Agent 2 Search').item.json.fields['Agent Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "f68b7167-d2c3-4cc1-8124-5a19be0e373c",
+              "name": "agentRecordId",
+              "value": "={{ $('Agent 2 Search').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1968,
+        -48
+      ],
+      "id": "98182890-8259-4c8e-a961-1300549cc955",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        2192,
+        -48
+      ],
+      "id": "7b02bf85-8c98-4178-be29-62aa26858f97",
+      "name": "Limit1"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "limitWaitTime": true,
+        "resumeUnit": "minutes",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        -48
+      ],
+      "id": "f12b7e5c-ca8c-49a0-b200-4344574bfeb0",
+      "name": "Agent 2 Wait",
+      "webhookId": "d0316c8e-3485-4f5f-9382-14eab54ccd1f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "451a319d-2abf-40b7-9aa1-fac47c49edf5",
+              "leftValue": "={{ $json.query.agentid }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2864,
+        -48
+      ],
+      "id": "f4302059-d1a2-4d5f-b5f5-559260cb64fa",
+      "name": "Agent 2 Condition"
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $json.fields['Email / GCal ID'] }}",
+          "mode": "id"
+        },
+        "timeMax": "={{ $now.plus(30, 'minutes') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1744,
+        -48
+      ],
+      "id": "3b3bf060-c3c8-4065-8f74-cb1571a557aa",
+      "name": "Get Agent 2 Availability",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "DIL2TIITldKcFrnP",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegramId }}",
+        "text": "=🏠 NEW LEAD — ACTION NEEDED\n\nName: {{ $('Webhook').item.json.body.lead_name }}\nProperty: {{ $('Webhook').item.json.body.property }}\nPhone: {{ $('Webhook').item.json.body.lead_phone }}\n\nFirst to accept gets the lead. You have 3 minutes.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Accept Lead",
+                    "additionalFields": {
+                      "url": "={{ $('Edit Fields').item.json.acceptlink }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2416,
+        -48
+      ],
+      "id": "89b00b10-ad4c-4386-9526-a06e12c085a6",
+      "name": "Send a text message to Agent 2",
+      "webhookId": "24723985-6843-411a-bae2-fc976088b244",
+      "credentials": {
+        "telegramApi": {
+          "id": "KlzaAi4OrJBcw89J",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "451a319d-2abf-40b7-9aa1-fac47c49edf5",
+              "leftValue": "={{ $json.query.agentid }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3536,
+        48
+      ],
+      "id": "0535a38e-174a-4524-9e29-fcc970999310",
+      "name": "Agent 2 Condition1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appusvuMelGd1hjox",
+          "mode": "list",
+          "cachedResultName": "Engine Leads",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblpSNcTwSrlVu4tI",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox/tblpSNcTwSrlVu4tI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Assigned",
+            "Assigned Agent": "={{ $('Limit1').item.json.agentName }}",
+            "id": "={{ $('Limit1').item.json.agentRecordId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Property Address",
+              "displayName": "Property Address",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Expired",
+                  "value": "Expired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3088,
+        -144
+      ],
+      "id": "f4121487-3f95-459a-8746-c37fc81fd2b1",
+      "name": "Agent 2 Assigned",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=5991474775",
+        "text": "=🚨 ESCALATED TO BROKER — LEAD UNCLAIMED\n\nName: {{ $('Webhook').item.json.body.lead_name }}\nProperty: {{ $('Webhook').item.json.body.property }}\nPhone: {{ $('Webhook').item.json.body.lead_phone }}\n\n2 agents did not respond in time. This lead now needs your direct attention.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Accept Lead",
+                    "additionalFields": {
+                      "url": "={{ $('Edit Fields').item.json.acceptlink }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3088,
+        48
+      ],
+      "id": "92d45551-bc0c-48c6-bfa7-193cbde7172a",
+      "name": "Escalated to Broker in Charge",
+      "webhookId": "24723985-6843-411a-bae2-fc976088b244",
+      "credentials": {
+        "telegramApi": {
+          "id": "KlzaAi4OrJBcw89J",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "limitWaitTime": true,
+        "resumeUnit": "minutes",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3312,
+        48
+      ],
+      "id": "0ad79466-bcba-418a-8c36-42c847b08fe8",
+      "name": "Broker wait",
+      "webhookId": "d0316c8e-3485-4f5f-9382-14eab54ccd1f"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appusvuMelGd1hjox",
+          "mode": "list",
+          "cachedResultName": "Engine Leads",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblpSNcTwSrlVu4tI",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox/tblpSNcTwSrlVu4tI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Assigned",
+            "Assigned Agent": "=Broker in Charge",
+            "id": "={{ $('Limit1').item.json.agentRecordId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Property Address",
+              "displayName": "Property Address",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Expired",
+                  "value": "Expired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3760,
+        -48
+      ],
+      "id": "9cd4fabe-a547-42c7-9d1c-f82bb947e1c6",
+      "name": "Broker assigned",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appusvuMelGd1hjox",
+          "mode": "list",
+          "cachedResultName": "Engine Leads",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblpSNcTwSrlVu4tI",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appusvuMelGd1hjox/tblpSNcTwSrlVu4tI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Expired",
+            "id": "={{ $('Limit1').item.json.agentRecordId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Lead Name",
+              "displayName": "Lead Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Property Address",
+              "displayName": "Property Address",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Expired",
+                  "value": "Expired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Assigned Agent",
+              "displayName": "Assigned Agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        3760,
+        144
+      ],
+      "id": "3d518614-49e7-4cab-837e-e716ce4ca7a5",
+      "name": "Lead Expired",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "nyCPE6hR4f6oprba",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "attempt tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "Get availability in a calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get availability in a calendar": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Update record1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a record": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "attempt tracking": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 Search": {
+      "main": [
+        [
+          {
+            "node": "Get Agent 2 Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Limit1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message to Agent 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 Wait": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Condition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Agent 2 Availability": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message to Agent 2": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 Condition": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalated to Broker in Charge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 Condition1": {
+      "main": [
+        [
+          {
+            "node": "Broker assigned",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lead Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalated to Broker in Charge": {
+      "main": [
+        [
+          {
+            "node": "Broker wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Broker wait": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Condition1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c45e57ae-b90e-4e57-aa5c-3daf52a9574a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "94601b8aa09b9d06dea64da9d330092a1ba341e8a0fadad7e028a9c56476f9e3"
+  },
+  "nodeGroups": [],
+  "id": "zm7Kkszm11xqqId9",
+  "tags": []
+}
